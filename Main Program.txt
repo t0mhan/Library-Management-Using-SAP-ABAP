@@ -1,0 +1,740 @@
+*&---------------------------------------------------------------------*
+*& Report  ZJA_MINI_VENDOR_PROJECT
+*&
+*&---------------------------------------------------------------------*
+*&
+*&  Main Program of Direct Vendor Invoice Mini App
+*&---------------------------------------------------------------------*
+
+REPORT  ZJA_MINI_VENDOR_PROJECT.
+TYPE-POOLS: SLIS.
+
+*****************DATABASE TABLES*********************
+
+TABLES : ZJA_VENDOR, " Vendor Master Table
+         ZJA_MATERIALS, "  Material Master Table
+         ZJA_INVOICE, " Invoice Transaction Table
+         ZJA_AUTH. "  Authorisation Master Table
+**************************************
+
+DATA : OK_CODE   TYPE SY-UCOMM,  " gloabal variable
+        FLAG(1) TYPE C.
+
+DATA: it_fieldcat  TYPE slis_t_fieldcat_alv,
+      wa_fieldcat  TYPE slis_fieldcat_alv.
+DATA : IT_INVOICE TYPE STANDARD TABLE OF ZJA_INVOICE WITH HEADER LINE.
+
+*****************LOCAL VENDOR CLASS DEFINITION*********************
+CLASS ZJA_VENDOR DEFINITION.
+  PUBLIC SECTION.
+
+  METHODS DISPLAY_VENDOR "Display Vendor Details
+          IMPORTING
+            VENDOR_NO LIKE ZJA_INVOICE-LIFNR
+          EXPORTING
+            ZJA_VENDOR_STR LIKE ZJA_VENDOR
+          EXCEPTIONS
+            NO_DATA.
+  ENDCLASS.
+**************************************
+
+*****************VENDOR CLASS IMPLEMENTATION*********************
+CLASS ZJA_VENDOR IMPLEMENTATION.
+
+  METHOD DISPLAY_VENDOR.
+
+   SELECT SINGLE * FROM ZJA_VENDOR INTO ZJA_VENDOR_STR WHERE LIFNR = VENDOR_NO.
+
+     IF SY-SUBRC = 0.
+
+       ZJA_VENDOR-NAME = ZJA_VENDOR_STR-NAME.
+       ZJA_VENDOR-CITY = ZJA_VENDOR_STR-CITY.
+       ZJA_VENDOR-ADDRESS = ZJA_VENDOR_STR-ADDRESS.
+       ZJA_VENDOR-POSTAL_CODE = ZJA_VENDOR_STR-POSTAL_CODE.
+       ZJA_VENDOR-TELEPHONE = ZJA_VENDOR_STR-TELEPHONE.
+       ZJA_VENDOR-FAX = ZJA_VENDOR_STR-FAX.
+       ZJA_VENDOR-PAY_TERM = ZJA_VENDOR_STR-PAY_TERM.
+
+       ELSE.
+         MESSAGE E003(ZJA_MSGCLASS) WITH VENDOR_NO RAISING NO_DATA DISPLAY LIKE 'I'.
+         ENDIF.
+
+    ENDMETHOD.
+  ENDCLASS.
+**************************************
+
+START-OF-SELECTION.
+
+
+CALL SCREEN 100.
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*      Changing Screen Properties According to Authorisation
+*----------------------------------------------------------------------*
+MODULE STATUS_0100 OUTPUT.
+ SET PF-STATUS 'ZJA_INVOICE'.
+ SET TITLEBAR 'ZJA_100'.
+
+  PERFORM GET_PICTURE. " Sub-Routine To Display Logo
+
+*****************Displaying Main Menu Buttons*********************
+
+ OK_CODE = ' '.
+
+   LOOP AT SCREEN.
+
+     IF ZJA_AUTH-NAME <> ' '.
+        IF SCREEN-NAME = 'ZJA_AUTH-NAME'.
+          SCREEN-INVISIBLE = '0'.
+          ENDIF.
+     ENDIF.
+
+    IF ZJA_AUTH-PARK_A = 'X'.
+       IF SCREEN-NAME = 'CREATE_INVOICE' OR SCREEN-NAME = 'REPORT_GENERATE'.
+          SCREEN-INVISIBLE = '0'.
+       ENDIF.
+    ENDIF.
+
+    IF ZJA_AUTH-POST_A = 'X'.
+       IF SCREEN-NAME = 'POST_INVOICE'  OR SCREEN-NAME = 'REPORT_GENERATE'.
+          SCREEN-INVISIBLE = '0'.
+       ENDIF.
+    ENDIF.
+
+    IF ZJA_AUTH-REV_A = 'X'.
+       IF SCREEN-NAME = 'REVERSE_INVOICE'  OR SCREEN-NAME = 'REPORT_GENERATE'.
+          SCREEN-INVISIBLE = '0'.
+       ENDIF.
+    ENDIF.
+
+        MODIFY SCREEN.
+
+    ENDLOOP.
+**************************************
+
+    CASE SY-UCOMM.
+      WHEN 'BACK'.
+        CLEAR : ZJA_AUTH.
+
+        LOOP AT SCREEN.
+
+          IF SCREEN-NAME = 'REVERSE_INVOICE'
+            OR SCREEN-NAME = 'CREATE_INVOICE'
+            OR SCREEN-NAME = 'POST_INVOICE'
+            OR SCREEN-NAME = 'ZJA_AUTH-NAME'
+            OR SCREEN-NAME = 'REPORT_GENERATE'.
+          SCREEN-INVISIBLE = '1'.
+          ENDIF.
+
+          MODIFY SCREEN.
+
+        ENDLOOP.
+    ENDCASE.
+
+ENDMODULE.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0200  OUTPUT
+*&---------------------------------------------------------------------*
+*       Display Picture, Handling gui status
+*----------------------------------------------------------------------*
+MODULE STATUS_0200 OUTPUT.
+  SET PF-STATUS 'ZJA_MAIN'.
+  SET TITLEBAR 'ZJA_200'.
+
+  PERFORM GET_PICTURE.
+
+ CASE OK_CODE.
+ 	WHEN 'BACK'.
+    CLEAR : ZJA_VENDOR, ZJA_INVOICE-LIFNR , ZJA_INVOICE.
+    CALL SCREEN 100.
+ ENDCASE.
+
+ENDMODULE.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0200  INPUT
+*&---------------------------------------------------------------------*
+*     Creation of Invoice / Parking the Invoice
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0200 INPUT.
+  DATA REF_OBJ_INV TYPE REF TO ZJA_GC_INVOICE_MGMT. " object of global class declaration
+  CREATE OBJECT REF_OBJ_INV. " object of global class creation
+
+  CASE SY-UCOMM.
+    WHEN 'PARKINV'.
+      PERFORM VALIDATE_INPUT.
+      IF FLAG = 'X'.
+        EXIT.
+      ENDIF.
+
+
+      CALL METHOD REF_OBJ_INV->CREATE_INVOICE
+        EXPORTING
+        INVOICE_STR  = ZJA_INVOICE
+        IMPORTING
+          INVOICE_NO  = ZJA_INVOICE-INV_NO
+        EXCEPTIONS
+          NO_DATA     = 1
+          others      = 2
+              .
+      IF SY-SUBRC <> 0.
+       MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+                  WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+       ELSE.
+         MESSAGE I004(ZJA_MSGCLASS) WITH ZJA_INVOICE-INV_NO DISPLAY LIKE 'I'.
+      ENDIF.
+
+  ENDCASE.
+
+ENDMODULE.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0300  OUTPUT
+*&---------------------------------------------------------------------*
+*       Handling GUI Status.
+*----------------------------------------------------------------------*
+MODULE STATUS_0300 OUTPUT.
+  SET PF-STATUS 'ZJA_MAIN'.
+   SET TITLEBAR 'ZJA_300'.
+
+  CASE OK_CODE.
+ 	WHEN 'BACK'.
+    CLEAR ZJA_INVOICE.
+       CALL SCREEN 100.
+ ENDCASE.
+
+ENDMODULE.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       Exit Screen for Function Key 'E'
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0100 INPUT.
+
+  IF OK_CODE = 'EXIT'.
+    LEAVE PROGRAM.
+  ENDIF.
+
+ENDMODULE.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  VALIDATE_INPUT_100  INPUT
+*&---------------------------------------------------------------------*
+*       Authorisation Check for Access ID.
+*----------------------------------------------------------------------*
+MODULE VALIDATE_INPUT_100 INPUT.
+DATA : ZJA_AUTH_STR TYPE ZJA_AUTH.
+
+ SELECT SINGLE * FROM ZJA_AUTH INTO ZJA_AUTH_STR WHERE EMP_ID = ZJA_AUTH-EMP_ID.
+
+    IF SY-SUBRC = 0.
+*     MESSAGE S001(ZJA_MSGCLASS) WITH ZJA_AUTH-EMP_ID.
+     ZJA_AUTH-NAME = ZJA_AUTH_STR-NAME.
+     ZJA_AUTH-PARK_A = ZJA_AUTH_STR-PARK_A.
+     ZJA_AUTH-POST_A = ZJA_AUTH_STR-POST_A.
+     ZJA_AUTH-REV_A = ZJA_AUTH_STR-REV_A.
+
+     ELSE.
+       MESSAGE E002(ZJA_MSGCLASS) WITH ZJA_AUTH-EMP_ID DISPLAY LIKE 'I'.
+
+      ENDIF.
+ENDMODULE.
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  DIRECT_SCREENS_0100  INPUT
+*&---------------------------------------------------------------------*
+*       Directing Screens on pressing Pushbuttons
+*----------------------------------------------------------------------*
+MODULE DIRECT_SCREENS_0100 INPUT.
+
+    CASE OK_CODE.
+      WHEN 'CREATE'.
+        CALL SCREEN 0200.
+      WHEN 'POST'.
+        CALL SCREEN 400.
+      WHEN 'REVERSE'.
+        CALL SCREEN 0300.
+      WHEN 'RGEN'.
+        CALL SCREEN 0500.
+    ENDCASE.
+
+ENDMODULE.
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  GET_VENDOR_0200  INPUT
+*&---------------------------------------------------------------------*
+*       Display Vendor Details on Screen
+*----------------------------------------------------------------------*
+MODULE GET_VENDOR_0200 INPUT.
+   DATA : REF_OBJ TYPE REF TO ZJA_VENDOR, " object of local class declaration
+*          VENDOR_CODE LIKE ZJA_INVOICE-LIFNR, " actual parameter for exporting
+          VENDOR_STR LIKE ZJA_VENDOR. " actual parameter for importing
+   CREATE OBJECT REF_OBJ.   " object of local class creation
+
+   REF_OBJ->DISPLAY_VENDOR( EXPORTING VENDOR_NO = ZJA_INVOICE-LIFNR  IMPORTING ZJA_VENDOR_STR = VENDOR_STR ). " calling public method of local class
+ENDMODULE.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0400  OUTPUT
+*&---------------------------------------------------------------------*
+*       Changing SCREEN properties on pressing pushbuttons
+*       Handling GUI Status
+*----------------------------------------------------------------------*
+MODULE STATUS_0400 OUTPUT.
+
+   SET PF-STATUS 'ZJA_MAIN'.
+   SET TITLEBAR 'ZJA_400'.
+
+
+ CASE SY-UCOMM.
+   WHEN 'EDIT'.
+      LOOP AT SCREEN.
+
+        IF SCREEN-NAME = 'ZJA_INVOICE-INV_CDATE' OR
+          SCREEN-NAME = 'ZJA_INVOICE-MAT_RDATE' OR SCREEN-NAME = 'ZJA_INVOICE-QNTY' OR SCREEN-NAME = 'ZJA_INVOICE-TEXT'.
+          SCREEN-INPUT = '1'.
+        ENDIF.
+
+        IF SCREEN-NAME = 'CALCULATE'.
+          SCREEN-INVISIBLE = '0'.
+         ENDIF.
+
+        MODIFY SCREEN.
+
+     ENDLOOP.
+
+    WHEN 'BACK'.
+      CLEAR ZJA_INVOICE.
+    CALL SCREEN 100.
+  ENDCASE.
+
+ENDMODULE.
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0400  INPUT
+*&---------------------------------------------------------------------*
+*       Posting Invoice & Recalculation on Edit
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0400 INPUT.
+  CASE SY-UCOMM.
+
+    WHEN 'POSTINV'.
+      CLEAR : FLAG.
+     IF ZJA_INVOICE-INV_NO IS INITIAL.
+       MESSAGE I012(ZJA_MSGCLASS) DISPLAY LIKE 'I'.
+       FLAG = 'X'.
+     ENDIF.
+     IF FLAG = 'X'.
+       EXIT.
+     ENDIF.
+
+    ZJA_INVOICE-DOC_STATUS = 'PO'.
+    MODIFY ZJA_INVOICE FROM ZJA_INVOICE.
+
+    IF SY-SUBRC = 0.
+      MESSAGE I006(ZJA_MSGCLASS) WITH ZJA_INVOICE-INV_NO DISPLAY LIKE 'I'.
+      ELSE.
+        MESSAGE E007(ZJA_MSGCLASS) DISPLAY LIKE 'I'.
+        ENDIF.
+
+     WHEN 'RCALC'.
+       CLEAR: FLAG.
+
+      IF FLAG = 'X'.
+        EXIT.
+       ENDIF.
+      PERFORM CALL_PAY_TERM_CALC_METHOD.
+  ENDCASE.
+ENDMODULE.
+
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  GET_INVOICE_0400  INPUT
+*&---------------------------------------------------------------------*
+*       Displaying Invoice Details before Posting.
+*----------------------------------------------------------------------*
+MODULE GET_INVOICE_0400 INPUT.
+   DATA : REF_OBJ_POST TYPE REF TO ZJA_GC_INVOICE_MGMT.
+   CREATE OBJECT REF_OBJ_POST.
+
+   CALL METHOD REF_OBJ_POST->POST_INVOICE
+     EXPORTING
+       INV_NO  = ZJA_INVOICE-INV_NO
+     IMPORTING
+       INV_STR = ZJA_INVOICE.
+
+ENDMODULE.
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_PICTURE
+*&---------------------------------------------------------------------*
+*       Uploading Logo (Picture) on Screen
+*----------------------------------------------------------------------*
+*
+*      Subroutine GET_PICTURE
+*----------------------------------------------------------------------*
+FORM GET_PICTURE .
+
+  DATA: W_LINES TYPE I.
+  TYPES PICT_LINE(256) TYPE C.
+
+  DATA :
+  CONTAINER TYPE REF TO CL_GUI_CUSTOM_CONTAINER,
+  EDITOR TYPE REF TO CL_GUI_TEXTEDIT,
+  PICTURE TYPE REF TO CL_GUI_PICTURE,
+  PICT_TAB TYPE TABLE OF PICT_LINE,
+  URL(255) TYPE C.
+
+  DATA: GRAPHIC_URL(255).
+  DATA: BEGIN OF GRAPHIC_TABLE OCCURS 0,
+          LINE(255) TYPE X,
+        END OF GRAPHIC_TABLE.
+  DATA: L_GRAPHIC_CONV TYPE I.
+  DATA: L_GRAPHIC_OFFS TYPE I.
+  DATA: GRAPHIC_SIZE TYPE I.
+  DATA: L_GRAPHIC_XSTR TYPE XSTRING.
+  .
+
+  CALL METHOD CL_GUI_CFW=>FLUSH.    " calling method of Static Class
+  CREATE OBJECT:
+  CONTAINER EXPORTING CONTAINER_NAME = 'PICTURE_CONTAINER',
+  PICTURE EXPORTING PARENT = CONTAINER.
+  CALL METHOD CL_SSF_XSF_UTILITIES=>GET_BDS_GRAPHIC_AS_BMP
+    EXPORTING
+      P_OBJECT       = 'GRAPHICS'
+      P_NAME         = 'AAJA_LOGO'
+      P_ID           = 'BMAP'
+      P_BTYPE        = 'BMON'
+    RECEIVING
+      P_BMP          = L_GRAPHIC_XSTR
+*  EXCEPTIONS
+*    NOT_FOUND      = 1
+*    INTERNAL_ERROR = 2
+*    others         = 3
+          .
+  IF SY-SUBRC <> 0.
+ MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+  GRAPHIC_SIZE = XSTRLEN( L_GRAPHIC_XSTR ).
+  L_GRAPHIC_CONV = GRAPHIC_SIZE.
+  L_GRAPHIC_OFFS = 0.
+
+  WHILE L_GRAPHIC_CONV > 255.
+    GRAPHIC_TABLE-LINE = L_GRAPHIC_XSTR+L_GRAPHIC_OFFS(255).
+    APPEND GRAPHIC_TABLE.
+    L_GRAPHIC_OFFS = L_GRAPHIC_OFFS + 255.
+    L_GRAPHIC_CONV = L_GRAPHIC_CONV - 255.
+  ENDWHILE.
+
+  GRAPHIC_TABLE-LINE = L_GRAPHIC_XSTR+L_GRAPHIC_OFFS(L_GRAPHIC_CONV).
+  APPEND GRAPHIC_TABLE.
+
+  CALL FUNCTION 'DP_CREATE_URL'
+    EXPORTING
+      TYPE     = 'IMAGE'
+      SUBTYPE  = 'X-UNKNOWN'
+      SIZE     = GRAPHIC_SIZE
+      LIFETIME = 'T'
+    TABLES
+      DATA     = GRAPHIC_TABLE
+    CHANGING
+      URL      = URL.
+
+  CALL METHOD PICTURE->LOAD_PICTURE_FROM_URL
+    EXPORTING
+      URL = URL.
+
+  CALL METHOD PICTURE->SET_DISPLAY_MODE
+    EXPORTING
+      DISPLAY_MODE = PICTURE->DISPLAY_MODE_FIT_CENTER.
+
+ENDFORM.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0300  INPUT
+*&---------------------------------------------------------------------*
+*       Reversing or Deleting Invoice
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0300 INPUT.
+
+  DATA : REF_OBJ_REV TYPE REF TO ZJA_GC_INVOICE_MGMT.
+
+  CREATE OBJECT REF_OBJ_REV.
+  CALL METHOD REF_OBJ_REV->REVERSE_INVOICE    " Displaying Invoice Details
+    EXPORTING
+      INV_NO  = ZJA_INVOICE-INV_NO
+    IMPORTING
+      INV_STR = ZJA_INVOICE.
+
+
+  CASE SY-UCOMM.
+    WHEN 'REVINV'.
+      CLEAR : FLAG.
+      IF ZJA_INVOICE-INV_NO IS INITIAL.
+        MESSAGE I012(ZJA_MSGCLASS) DISPLAY LIKE 'I'.
+        FLAG = 'X'.
+      ENDIF.
+      IF FLAG = 'X'.
+        EXIT.
+      ENDIF.
+    ZJA_INVOICE-DOC_STATUS = 'RE'.
+    MODIFY ZJA_INVOICE FROM ZJA_INVOICE.
+
+    IF SY-SUBRC = 0.
+      MESSAGE I009(ZJA_MSGCLASS) WITH ZJA_INVOICE-INV_NO DISPLAY LIKE 'I'.
+      ELSE.
+        MESSAGE E010(ZJA_MSGCLASS) DISPLAY LIKE 'I'.
+        ENDIF.
+
+  ENDCASE.
+
+
+ENDMODULE.
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Module  CALL_PAY_TERM  INPUT
+*&---------------------------------------------------------------------*
+*       Calculation for Net Amount & Deducted Amount
+*----------------------------------------------------------------------*
+MODULE CALL_PAY_TERM INPUT.
+
+DATA : REF_OBJ_PAY TYPE  REF TO ZJA_GC_INVOICE_MGMT.
+CREATE OBJECT REF_OBJ_PAY.
+
+CALL METHOD REF_OBJ_PAY->PAY_TERM_CALC   " calling public method of global class
+  EXPORTING
+    PAY_TERM  = ZJA_VENDOR-PAY_TERM
+    MAT_ID    = ZJA_INVOICE-MAT_ID
+    INV_CDATE = ZJA_INVOICE-INV_CDATE
+    MAT_RDATE = ZJA_INVOICE-MAT_RDATE
+    QNTY      = ZJA_INVOICE-QNTY
+  IMPORTING
+    NET_AMT   = ZJA_INVOICE-NET_AMT
+    DED_AMT   = ZJA_INVOICE-DED_AMT.
+
+ENDMODULE.
+
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  CALL_PAY_TERM_CALC_METHOD
+*&---------------------------------------------------------------------*
+*       Subroutine for Recalculating Net Amt & Deducted Amt on Edit
+*----------------------------------------------------------------------*
+*       Updating Contents of Database Table on Edit
+*
+*----------------------------------------------------------------------*
+FORM CALL_PAY_TERM_CALC_METHOD .
+
+  DATA : V_PAY_TERM LIKE ZJA_VENDOR-PAY_TERM,
+         REF_OBJ_PAY TYPE  REF TO ZJA_GC_INVOICE_MGMT.
+
+  SELECT SINGLE PAY_TERM FROM ZJA_VENDOR INTO V_PAY_TERM WHERE LIFNR = ZJA_INVOICE-LIFNR.
+
+CREATE OBJECT REF_OBJ_PAY.
+
+CALL METHOD REF_OBJ_PAY->PAY_TERM_CALC
+  EXPORTING
+    PAY_TERM  = V_PAY_TERM
+    MAT_ID    = ZJA_INVOICE-MAT_ID
+    INV_CDATE = ZJA_INVOICE-INV_CDATE
+    MAT_RDATE = ZJA_INVOICE-MAT_RDATE
+    QNTY      = ZJA_INVOICE-QNTY
+  IMPORTING
+    NET_AMT   = ZJA_INVOICE-NET_AMT
+    DED_AMT   = ZJA_INVOICE-DED_AMT.
+
+MODIFY ZJA_INVOICE FROM ZJA_INVOICE.  " After Recalculation update Recalculate Amts in Database Table.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  VALIDATE_INPUT  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE VALIDATE_INPUT INPUT.
+
+
+ENDMODULE.                 " VALIDATE_INPUT  INPUT
+*&---------------------------------------------------------------------*
+*&      Form  VALIDATE_INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM VALIDATE_INPUT .
+   IF ZJA_INVOICE-MAT_ID IS INITIAL
+   OR ZJA_INVOICE-INV_CDATE IS INITIAL
+   OR ZJA_INVOICE-MAT_RDATE IS INITIAL
+   OR ZJA_INVOICE-QNTY IS INITIAL.
+    MESSAGE I012(ZJA_MSGCLASS) DISPLAY LIKE 'I'.
+    FLAG = 'X'.
+   ENDIF.
+
+ENDFORM.                    " VALIDATE_INPUT
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0500  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE STATUS_0500 OUTPUT.
+SET PF-STATUS 'ZJA_MAIN'.
+SET TITLEBAR 'ZJA_500'.
+
+PERFORM GET_PICTURE.
+
+CASE SY-UCOMM.
+WHEN 'BACK'.
+    CLEAR ZJA_INVOICE-DOC_STATUS.
+    CALL SCREEN 100.
+ENDCASE.
+
+ENDMODULE.                 " STATUS_0500  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0500  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0500 INPUT.
+
+  CASE SY-UCOMM.
+    WHEN 'GENR'.
+      PERFORM REPORT_GENERATE.
+  ENDCASE.
+
+ENDMODULE.                 " USER_COMMAND_0500  INPUT
+*&---------------------------------------------------------------------*
+*&      Form  REPORT_GENERATE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM REPORT_GENERATE .
+
+  SELECT * FROM ZJA_INVOICE INTO TABLE IT_INVOICE WHERE DOC_STATUS = ZJA_INVOICE-DOC_STATUS.
+
+
+  wa_fieldcat-fieldname  = 'INV_NO'.
+  wa_fieldcat-seltext_m  = 'Invoice No.'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+wa_fieldcat-fieldname  = 'LIFNR'.
+  wa_fieldcat-seltext_m  = 'Vendor Code'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'MAT_ID'.
+  wa_fieldcat-seltext_m  = 'Material ID'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'DOC_STATUS'.
+  wa_fieldcat-seltext_m  = 'Status'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'INV_CDATE'.
+  wa_fieldcat-seltext_m  = 'Invoice Date'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'MAT_RDATE'.
+  wa_fieldcat-seltext_m  = 'Material date'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'QNTY'.
+  wa_fieldcat-seltext_m  = 'Quantity'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'NET_AMT'.
+  wa_fieldcat-seltext_m  = 'Net Amount'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'DED_AMT'.
+  wa_fieldcat-seltext_m  = 'Deducted Amount'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+  wa_fieldcat-fieldname  = 'TEXT'.
+  wa_fieldcat-seltext_m  = 'Comments'.
+  APPEND wa_fieldcat TO it_fieldcat.
+
+
+CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      it_fieldcat   = it_fieldcat
+    TABLES
+      t_outtab      = IT_INVOICE
+    EXCEPTIONS
+      program_error = 1
+      OTHERS        = 2.
+
+ENDFORM.                    " REPORT_GENERATE
