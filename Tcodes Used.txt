@@ -4,5 +4,3 @@ SE80 - Object Navigator(Most of the Times).
 SE37 - Creation, Displaying, Changing Function Modules.
 SE24 -  Creation of Global Class
 SE91 -  Creation of Message Class
-SRNO - creation of Object for generationg auto-incremented Invoice Number
- 
