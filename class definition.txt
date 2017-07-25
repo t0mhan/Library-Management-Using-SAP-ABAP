@@ -1,0 +1,16 @@
+CLASS lcl_assign_book DEFINITION.
+  PUBLIC SECTION.
+    METHODS m_assign_book " method m_assign_book DEFINITION
+    IMPORTING
+      im_studentid TYPE int1
+      im_bookid TYPE int1
+      im_issuedate TYPE dats
+      im_returndate TYPE dats.
+
+    METHODS m_return_book  " method m_return_book DEFINITION
+    IMPORTING
+      im_studentid TYPE int1
+      im_bookid TYPE int1
+      im_returned_on TYPE dats.
+
+ENDCLASS.  

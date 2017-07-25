@@ -1,0 +1,6 @@
+PROCESS BEFORE OUTPUT.
+  MODULE status_0101.
+
+PROCESS AFTER INPUT.
+  MODULE adminlogin_0100.
+  MODULE student_login_0100.

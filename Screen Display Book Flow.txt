@@ -1,0 +1,15 @@
+PROCESS BEFORE OUTPUT.
+* MODULE STATUS_0112.
+  MODULE display_books_0122.
+
+  MODULE data_retrieval_0112.
+  LOOP AT itab_0112 INTO wa_0112 WITH CONTROL zinks_tab_dba.
+    MODULE populate_screen_0112.
+  ENDLOOP.
+
+PROCESS AFTER INPUT.
+  MODULE back_admin.
+  MODULE delete_admin.
+  MODULE logoff_0101.
+  LOOP AT itab_0112.
+  ENDLOOP.

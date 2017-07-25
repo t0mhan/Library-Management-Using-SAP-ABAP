@@ -1,0 +1,11 @@
+PROCESS BEFORE OUTPUT.
+  MODULE booked_history_0121.
+  MODULE data_retrieval_0121.
+  LOOP AT itab_0121 INTO wa_0121 WITH CONTROL zinks_tab_bh.
+    MODULE populate_screen_0121.
+  ENDLOOP.
+*
+PROCESS AFTER INPUT.
+  MODULE user_command_0121.
+  LOOP AT itab_0121.
+  ENDLOOP.

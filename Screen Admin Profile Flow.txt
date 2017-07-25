@@ -1,0 +1,9 @@
+PROCESS BEFORE OUTPUT.
+  MODULE status_0101.
+
+PROCESS AFTER INPUT.
+  MODULE assign_book_0101.
+  MODULE return_book_0101.
+  MODULE logoff_0101.
+  MODULE display_books_0101.
+  MODULE delete_book_details_0101.
