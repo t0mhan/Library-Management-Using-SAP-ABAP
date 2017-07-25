@@ -1,0 +1,40 @@
+METHOD m_assign_book.   " method m_assign_book IMPLEMENTATION
+    CLEAR it_assign.
+    CLEAR wa_assign.
+    SELECT * FROM zbookinventory INTO TABLE it_assign WHERE bookid = txt_bookid AND studentid = txt_studentid.
+    LOOP AT it_assign INTO wa_assign.
+      book_id_exists = wa_assign-bookid.
+    ENDLOOP.
+    IF book_id_exists <> 0.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '009'.
+      CLEAR txt_studentid.
+      CLEAR txt_bookid.
+      CLEAR txt_issuedate.
+      CLEAR txt_returndate.
+      CLEAR book_id_exists.
+    ELSE.
+      SELECT * FROM zbookdetails INTO TABLE it_check_qty WHERE bookid = txt_bookid.
+      LOOP AT it_check_qty INTO wa_check_qty.
+        quantity = wa_check_qty-qty.
+      ENDLOOP.
+      IF quantity = 0.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '005'.
+      ELSE.
+        quantity = quantity - 1.
+        wa_assign-studentid = im_studentid.
+        wa_assign-bookid = im_bookid.
+        wa_assign-issuedate = im_issuedate.
+        wa_assign-returndate = im_returndate.
+        APPEND wa_assign TO it_assign.
+        INSERT zbookinventory FROM TABLE it_assign.
+        UPDATE zbookdetails SET qty = quantity WHERE bookid = txt_bookid.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '003'.
+      ENDIF.
+    ENDIF.
+    CLEAR txt_studentid.
+    CLEAR txt_bookid.
+    CLEAR txt_issuedate.
+    CLEAR txt_returndate.
+    CLEAR book_id_exists.
+    CALL SCREEN 110.
+  ENDMETHOD.                    "m_assign_book

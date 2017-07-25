@@ -1,0 +1,28 @@
+ METHOD m_return_book.
+    CLEAR wa_check_qty.
+    CLEAR it_check_qty.
+    SELECT * FROM zbookinventory INTO TABLE it_assign WHERE bookid = im_bookid AND studentid = im_studentid.
+    LOOP AT it_assign INTO wa_assign.
+      book_returned = wa_assign-bookreturned.
+    ENDLOOP.
+    IF book_returned <> 0.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '006'.
+      CLEAR txt_book_id_return.
+      CLEAR txt_student_id_return.
+      CLEAR txt_returned_book.
+      CALL SCREEN 101.
+    ELSE.
+      SELECT * FROM zbookdetails INTO TABLE it_check_qty WHERE bookid = im_bookid.
+      LOOP AT it_check_qty INTO wa_check_qty.
+        quantity = wa_check_qty-qty.
+      ENDLOOP.
+  UPDATE zbookinventory SET bookreturned = im_returned_on WHERE bookid = im_bookid AND studentid = im_studentid .
+      quantity = quantity + 1.
+      UPDATE zbookdetails SET qty = quantity WHERE bookid =  im_bookid.
+      CLEAR txt_book_id_return.
+      CLEAR txt_student_id_return.
+      CLEAR txt_returned_book.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '004'.
+      CALL SCREEN 101.
+    ENDIF.
+  ENDMETHOD.                 "m_issue_book_implementation
