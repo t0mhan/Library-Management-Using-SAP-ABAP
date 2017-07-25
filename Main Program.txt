@@ -1,1 +1,480 @@
+*&---------------------------------------------------------------------*
+*& Include ZLIBRARY_MGMT_TOP
+*&
+*&---------------------------------------------------------------------*
+*       This is book management application for Library.
+*----------------------------------------------------------------------*
 
+PROGRAM  zlibrary_mgmt.
+TABLES : zbookdetails,
+         zbookinventory.
+CONTROLS : zinks_tab TYPE TABLEVIEW USING SCREEN 120 ,
+           zinks_tab_bh TYPE TABLEVIEW USING SCREEN 121 ,
+           zinks_tab_ib TYPE TABLEVIEW USING SCREEN 122,
+           zinks_tab_dba TYPE TABLEVIEW USING SCREEN 112.
+DATA: txt_username TYPE string,
+      txt_password TYPE sstring,
+      txt_studentid TYPE int1,
+      txt_bookid TYPE int1,
+      txt_issuedate TYPE dats,
+      txt_returndate TYPE dats,
+      txt_book_id_return TYPE int1,
+      txt_student_id_return TYPE int1,
+      txt_returned_book TYPE dats,
+      quantity TYPE i,
+      book_returned TYPE dats,
+      txt_book_id_delete TYPE int1,
+      book_id_exists TYPE int1.
+DATA :itab TYPE STANDARD TABLE OF zbookdetails INITIAL SIZE 0,
+      wa TYPE zbookdetails.
+DATA :itab_0121 TYPE STANDARD TABLE OF zbookinventory INITIAL SIZE 0,
+      wa_0121 TYPE zbookinventory.
+DATA : itab_0122 TYPE STANDARD TABLE OF zbookinventory INITIAL SIZE 0,
+      wa_0122 TYPE zbookinventory.
+DATA : itab_0112 TYPE STANDARD TABLE OF zbookdetails INITIAL SIZE 0,
+      wa_0112 TYPE zbookdetails.
+DATA it_assign TYPE STANDARD TABLE OF zbookinventory.
+DATA wa_assign TYPE zbookinventory.
+DATA it_login TYPE STANDARD TABLE OF zlogindetails.
+DATA wa_login TYPE zlogindetails.
+DATA it_check_qty TYPE STANDARD TABLE OF zbookdetails.
+DATA wa_check_qty TYPE zbookdetails.
+*&---------------------------------------------------------------------*
+*&      Class lcl_assign_book
+*&---------------------------------------------------------------------*
+*       Definition of class lcl_assign_book with it's two methods
+*----------------------------------------------------------------------*
+CLASS lcl_assign_book DEFINITION.
+  PUBLIC SECTION.
+    METHODS m_assign_book " method m_assign_book DEFINITION
+    IMPORTING
+      im_studentid TYPE int1
+      im_bookid TYPE int1
+      im_issuedate TYPE dats
+      im_returndate TYPE dats.
+
+    METHODS m_return_book  " method m_return_book DEFINITION
+    IMPORTING
+      im_studentid TYPE int1
+      im_bookid TYPE int1
+      im_returned_on TYPE dats.
+
+ENDCLASS.                    "lcl_assign_book DEFINITION ends here
+
+*&---------------------------------------------------------------------*
+*&      Class lcl_assign_book
+*&---------------------------------------------------------------------*
+*       Implementation of class lcl_assign_book with it's two methods
+*----------------------------------------------------------------------*
+CLASS lcl_assign_book IMPLEMENTATION.
+  METHOD m_assign_book.   " method m_assign_book IMPLEMENTATION
+    CLEAR it_assign.
+    CLEAR wa_assign.
+    SELECT * FROM zbookinventory INTO TABLE it_assign WHERE bookid = txt_bookid AND studentid = txt_studentid.
+    LOOP AT it_assign INTO wa_assign.
+      book_id_exists = wa_assign-bookid.
+    ENDLOOP.
+    IF book_id_exists <> 0.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '009'.
+      CLEAR txt_studentid.
+      CLEAR txt_bookid.
+      CLEAR txt_issuedate.
+      CLEAR txt_returndate.
+      CLEAR book_id_exists.
+    ELSE.
+      SELECT * FROM zbookdetails INTO TABLE it_check_qty WHERE bookid = txt_bookid.
+      LOOP AT it_check_qty INTO wa_check_qty.
+        quantity = wa_check_qty-qty.
+      ENDLOOP.
+      IF quantity = 0.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '005'.
+      ELSE.
+        quantity = quantity - 1.
+        wa_assign-studentid = im_studentid.
+        wa_assign-bookid = im_bookid.
+        wa_assign-issuedate = im_issuedate.
+        wa_assign-returndate = im_returndate.
+        APPEND wa_assign TO it_assign.
+        INSERT zbookinventory FROM TABLE it_assign.
+        UPDATE zbookdetails SET qty = quantity WHERE bookid = txt_bookid.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '003'.
+      ENDIF.
+    ENDIF.
+    CLEAR txt_studentid.
+    CLEAR txt_bookid.
+    CLEAR txt_issuedate.
+    CLEAR txt_returndate.
+    CLEAR book_id_exists.
+    CALL SCREEN 110.
+  ENDMETHOD.                    "m_assign_book
+  "m_assig_book_implementation
+  METHOD m_return_book.
+    CLEAR wa_check_qty.
+    CLEAR it_check_qty.
+    SELECT * FROM zbookinventory INTO TABLE it_assign WHERE bookid = im_bookid AND studentid = im_studentid.
+    LOOP AT it_assign INTO wa_assign.
+      book_returned = wa_assign-bookreturned.
+    ENDLOOP.
+    IF book_returned <> 0.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '006'.
+      CLEAR txt_book_id_return.
+      CLEAR txt_student_id_return.
+      CLEAR txt_returned_book.
+      CALL SCREEN 101.
+    ELSE.
+      SELECT * FROM zbookdetails INTO TABLE it_check_qty WHERE bookid = im_bookid.
+      LOOP AT it_check_qty INTO wa_check_qty.
+        quantity = wa_check_qty-qty.
+      ENDLOOP.
+  UPDATE zbookinventory SET bookreturned = im_returned_on WHERE bookid = im_bookid AND studentid = im_studentid .
+      quantity = quantity + 1.
+      UPDATE zbookdetails SET qty = quantity WHERE bookid =  im_bookid.
+      CLEAR txt_book_id_return.
+      CLEAR txt_student_id_return.
+      CLEAR txt_returned_book.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '004'.
+      CALL SCREEN 101.
+    ENDIF.
+  ENDMETHOD.                 "m_issue_book_implementation
+ENDCLASS.                    "lcl_assign_book IMPLEMENTATION
+
+
+*&---------------------------------------------------------------------*
+*&      Module  ADMIN_LOGIN_0100  INPUT
+*&---------------------------------------------------------------------*
+*       This module is for admin login into sysytem
+*----------------------------------------------------------------------*
+
+MODULE adminlogin_0100 INPUT.
+  IF sy-ucomm = 'FCT_ADMIN'.
+    SELECT * FROM zlogindetails INTO TABLE it_login.
+    LOOP AT it_login INTO wa_login.
+      IF wa_login-username = txt_username AND wa_login-password = txt_password AND wa_login-usertype = 1.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '000'.
+        CALL SCREEN 101.
+      ENDIF.
+    ENDLOOP.
+    MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '001'.
+  ENDIF.
+ENDMODULE.                 " LOGIN_03_0100  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  STUDENT_LOGIN_0100  INPUT
+*&---------------------------------------------------------------------*
+*       This module is for student login into system
+*----------------------------------------------------------------------*
+MODULE student_login_0100 INPUT.
+  IF sy-ucomm = 'FCT_STUDENT'.
+    SELECT * FROM zlogindetails INTO TABLE it_login.
+    LOOP AT it_login INTO wa_login.
+      IF wa_login-username = txt_username AND wa_login-password = txt_password AND wa_login-usertype = 2.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '000'.
+        CALL SCREEN 102.
+      ENDIF.
+    ENDLOOP.
+    MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '001'.
+  ENDIF.
+ENDMODULE.                 " STUDENT_LOGIN_0100  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  ASSIGN_BOOK_0101  INPUT
+*&---------------------------------------------------------------------*
+MODULE assign_book_0101 INPUT.
+  IF sy-ucomm = 'FCT_ASSIGN'.
+    CALL SCREEN 110.
+  ENDIF.
+ENDMODULE.                 " ASSIGN_BOOK_0101  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  ASSIGN_BOOK_0110  INPUT
+*&---------------------------------------------------------------------*
+*       We are calling the method m_assign_book from this module.
+*----------------------------------------------------------------------*
+MODULE assign_book_0110 INPUT.
+  IF sy-ucomm = 'FCT_ASSIGN_BOOK'.
+    DATA obj_lcl_assign_book TYPE REF TO lcl_assign_book.
+    CREATE OBJECT obj_lcl_assign_book.
+    obj_lcl_assign_book->m_assign_book(
+                                        im_studentid = txt_studentid
+                                        im_bookid = txt_bookid
+                                        im_issuedate = txt_issuedate
+                                        im_returndate = txt_returndate
+                                       ).
+  ENDIF.
+ENDMODULE.                 " ASSIGN_BOOK_0110  INPUT
+*----------------------------------------------------------------------*
+*  MODULE RETURN_BOOK_0111 INPUT
+*----------------------------------------------------------------------*
+MODULE return_book_0101 INPUT.
+  IF sy-ucomm = 'FCT_RETURN'.
+    CALL SCREEN 111.
+  ENDIF.
+ENDMODULE.                    "RETURN_BOOK_0111 INPUT
+*&---------------------------------------------------------------------*
+*&      Module  RETUEN_BOOK_0111  INPUT
+*&---------------------------------------------------------------------*
+*        We are calling the method m_return_book from this module.
+*----------------------------------------------------------------------*
+MODULE returned_book_0111 INPUT.
+  IF sy-ucomm = 'BTN_RETURN_BOOK'.
+    CREATE OBJECT obj_lcl_assign_book.
+    obj_lcl_assign_book->m_return_book(
+                                       im_studentid = txt_student_id_return
+                                       im_bookid = txt_book_id_return
+                                       im_returned_on = txt_returned_book
+                                       ).
+  ENDIF.
+ENDMODULE.                 " RETUEN_BOOK_0111  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  DELETE_BOOK_DETAILS_0113  INPUT
+*&---------------------------------------------------------------------*
+*       Deletion of book performed from ZBOOKDETAILS Table
+*----------------------------------------------------------------------*
+MODULE delete_book_details_0113 INPUT.
+  IF sy-ucomm = 'FCT_DELETE'.
+    CLEAR wa_assign.
+    CLEAR it_assign.
+    SELECT * FROM zbookinventory INTO TABLE it_assign WHERE bookid = txt_book_id_delete.
+    LOOP AT it_assign INTO wa_assign.
+      book_id_exists = wa_assign-bookid.
+    ENDLOOP.
+    IF book_id_exists <> 0.
+      MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '008'.
+      CALL SCREEN 101.
+    ELSE.
+      SELECT * FROM zbookdetails INTO TABLE it_check_qty WHERE bookid = txt_book_id_delete.
+      LOOP AT it_check_qty INTO wa_check_qty.
+        book_id_exists = wa_check_qty-bookid.
+      ENDLOOP.
+      IF book_id_exists <> 0.
+        DELETE FROM zbookdetails WHERE bookid = txt_book_id_delete.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '007'.
+        CALL SCREEN 101.
+      ELSE.
+        MESSAGE ID 'ZSYSMSG_MESSAGES' TYPE 'I' NUMBER '005'.
+      ENDIF.
+
+    ENDIF.
+    CLEAR txt_book_id_delete.
+  ENDIF.
+ENDMODULE.                 " DELETE_BOOK_DETAILS_0113  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  Data_Retrieval  OUTPUT
+*&---------------------------------------------------------------------*
+*       We used table control to display book inventory in tabular form
+*----------------------------------------------------------------------*
+MODULE data_retrieval OUTPUT.
+  SELECT * FROM zbookdetails INTO CORRESPONDING FIELDS OF TABLE itab.
+ENDMODULE.                 " Data_Retrieval  OUTPUT
+" POPULATE_SCREEN  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  POPULATE_SCREEN  OUTPUT
+*&---------------------------------------------------------------------*
+MODULE populate_screen OUTPUT.
+  MOVE-CORRESPONDING wa TO zbookdetails.
+ENDMODULE.                 " POPULATE_SCREEN  OUTPUT
+*&---------------------------------------------------------------------*
+" BOOK_DETAILS  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0120  INPUT
+*&---------------------------------------------------------------------*
+MODULE user_command_0120 INPUT.
+  IF sy-ucomm = 'BTN_BACK'.
+    CALL SCREEN 102.
+  ENDIF.
+ENDMODULE.                 " USER_COMMAND_0120  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  BOOK_DETAILS_0102  INPUT
+*&---------------------------------------------------------------------*
+MODULE book_details_0102 INPUT.
+  IF sy-ucomm = 'FCT_DISPLAY'.
+    CALL SCREEN 120.
+  ENDIF.
+ENDMODULE.                 " BOOK_DETAILS_0102  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  Data_Retrieval_0121  OUTPUT
+*&---------------------------------------------------------------------*
+MODULE  data_retrieval_0121 OUTPUT.
+  CLEAR itab.
+  CLEAR wa.
+  SELECT * FROM zbookinventory INTO CORRESPONDING FIELDS OF TABLE itab_0121 WHERE studentid = txt_username.
+ENDMODULE.                 " Data_Retrieval_0121  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  POPULATE_SCREEN_0121  OUTPUT
+*&---------------------------------------------------------------------*
+MODULE populate_screen_0121 OUTPUT.
+  MOVE-CORRESPONDING wa_0121 TO zbookinventory.
+ENDMODULE.                 " POPULATE_SCREEN_0121  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  BOOK_HISTORY_0102  INPUT
+*&---------------------------------------------------------------------*
+MODULE book_his_0102 INPUT.
+  IF sy-ucomm = 'FCT_HISTORY'.
+    CALL SCREEN 121.
+  ENDIF.
+ENDMODULE.                 " BOOK_HISTORY_0102  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0121  INPUT
+*&---------------------------------------------------------------------*
+MODULE user_command_0121 INPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 102.
+  ENDIF.
+ENDMODULE.                 " USER_COMMAND_0121  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0122  INPUT
+*&---------------------------------------------------------------------*
+MODULE user_command_0122 INPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 102.
+  ENDIF.
+ENDMODULE.                 " USER_COMMAND_0122  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  Data_Retrieval_0122  OUTPUT
+*&---------------------------------------------------------------------*
+MODULE data_retrieval_0122 OUTPUT.
+  SELECT studentid bookid issuedate returndate FROM zbookinventory
+    INTO CORRESPONDING FIELDS OF TABLE itab_0122 WHERE studentid = txt_username AND bookreturned = 0.
+ENDMODULE.                 " Data_Retrieval_0122  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  POPULATE_SCREEN_0122  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE populate_screen_0122 OUTPUT.
+  MOVE-CORRESPONDING wa_0122 TO zbookinventory.
+ENDMODULE.                 " POPULATE_SCREEN_0122  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  BOOK_ISSUED_0102  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE book_issued_0102 INPUT.
+  IF sy-ucomm = 'FCT_ISSUED'.
+    CALL SCREEN 122.
+  ENDIF.
+ENDMODULE.                 " BOOK_ISSUED_0102  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  LOGOFF_0102  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE logoff_0102 INPUT.
+  IF sy-ucomm = 'FCT_LOGOFF'.
+    CLEAR : txt_username , txt_password , it_login , wa_login .
+    CALL SCREEN 100.
+  ENDIF.
+  .
+ENDMODULE.                 " LOGOFF_0102  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  LOGOFF_0101  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE logoff_0101 INPUT.
+  IF sy-ucomm = 'FCT_LOGOFF'.
+    CLEAR : txt_username , txt_password , it_login , wa_login .
+    CALL SCREEN 100.
+  ENDIF.
+ENDMODULE.                 " LOGOFF_0101  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  BACK_0110  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE back_0110 INPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 101.
+  ENDIF.
+ENDMODULE.                 " BACK_0110  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  BACK_0111  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE back_0111 INPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 101.
+  ENDIF.
+ENDMODULE.                 " BACK_0111  INPUT
+*&      Module  Data_Retrieval_0112  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE data_retrieval_0112 OUTPUT.
+  SELECT * FROM zbookdetails INTO CORRESPONDING FIELDS OF TABLE itab_0112.
+ENDMODULE.                 " Data_Retrieval_0112  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  POPULATE_SCREEN_0112  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE populate_screen_0112 OUTPUT.
+  MOVE-CORRESPONDING wa_0112 TO zbookdetails.
+ENDMODULE.                 " POPULATE_SCREEN_0112  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  DISPLAY_BOOK_0101  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE display_book_0101 INPUT.
+  IF sy-ucomm = 'FCT_DISPLAY'.
+    CALL SCREEN 112.
+  ENDIF.
+ENDMODULE.                 " DISPLAY_BOOK_0101  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  BACK_ADMIN  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE back_admin INPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 101.
+  ENDIF.
+ENDMODULE.                 " BACK_ADMIN  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  DELETE_BOOK_DETAILS_0101  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE delete_book_details_0101 INPUT.
+  IF sy-ucomm = 'FCT_DELETE_ADMIN'.
+    CALL SCREEN 113.
+  ENDIF.
+ENDMODULE.     " DELETE_BOOK_DETAILS_0101  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  BACK_ADMIN_0113  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE back_admin_0113 INPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 101.
+  ENDIF.
+ENDMODULE.                 " BACK_ADMIN_0113  INPUT
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0101  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0101 OUTPUT.
+  SET PF-STATUS '100'.
+  SET TITLEBAR '101'.
+ENDMODULE.                 " STATUS_0101  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0110  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0110 OUTPUT.
+  SET PF-STATUS '110'.
+  SET TITLEBAR '110'.
+
+ENDMODULE.                 " STATUS_0110  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  BACK_0110  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE back_0110 OUTPUT.
+  IF sy-ucomm = 'FCT_BACK'.
+    CALL SCREEN 101.
+  ENDIF.
+ENDMODULE.                 " BACK_0110  OUTPUT
